@@ -1,0 +1,9 @@
+# Requirements for Deep Active Inference PyTorch Implementation
+
+torch>=2.0.0
+numpy>=1.20.0
+matplotlib>=3.5.0
+scipy>=1.7.0
+
+# Optional but recommended for faster training
+# Install CUDA-enabled PyTorch from: https://pytorch.org/get-started/locally/

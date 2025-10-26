@@ -1,0 +1,46 @@
+# Sequential Finetuning Requirements
+# Install: pip install -r requirements_sequential_finetune.txt
+
+# Core dependencies (from base requirements.txt)
+numpy
+jax
+jaxtyping
+absl-py
+dm-haiku
+dm-tree
+tqdm
+
+# PyTorch ecosystem
+torch>=2.0.0
+torchvision
+torchaudio
+
+# HuggingFace for pretrained models
+transformers>=4.30.0
+tokenizers>=0.13.0
+accelerate>=0.20.0
+datasets>=2.12.0
+
+# Training utilities
+tensorboard>=2.13.0
+wandb  # Optional: for experiment tracking
+
+# Optional: BitNet quantization
+# bitnet  # Uncomment if using BitNet
+
+# Optional: MultiSWAG (Bayesian uncertainty)
+# push-bayes  # Uncomment if using MultiSWAG
+
+# Optional: Decoupled Neural Interfaces
+# Install separately from ~/src/dni-pytorch if needed
+
+# Data analysis
+pandas>=1.5.0
+matplotlib>=3.5.0  # For visualization
+seaborn>=0.12.0    # For enhanced plots
+
+# Development tools
+pytest
+black
+flake8
+mypy
