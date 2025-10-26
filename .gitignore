@@ -22,3 +22,27 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# ML artifacts
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.h5
+*.pkl
+*.pickle
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Logs and data
+*.log
+*.csv
+log_*.txt
+runs/
+wandb/
+
+# Training artifacts
+torch_params.pt
+*_pytorch_*.pt
