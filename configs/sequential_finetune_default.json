@@ -1,0 +1,45 @@
+{
+  "experiment_name": "sequential_utm_ctw",
+  "model": {
+    "name_or_path": "Skywork/Skywork-Reward-V2-Qwen3-0.6B",
+    "use_hf": true,
+    "device": "cuda"
+  },
+  "stages": {
+    "utm": {
+      "enabled": true,
+      "steps": 10000,
+      "lr": 1e-5,
+      "batch_size": 32,
+      "seq_length": 256,
+      "data_config": {
+        "memory_size": 10,
+        "maximum_steps": 100,
+        "tokenizer": "ascii",
+        "maximum_program_length": 100
+      }
+    },
+    "ctw": {
+      "enabled": true,
+      "steps": 5000,
+      "lr": 5e-6,
+      "batch_size": 32,
+      "seq_length": 256,
+      "data_config": {
+        "max_depth": 5
+      }
+    }
+  },
+  "training": {
+    "seed": 42,
+    "save_every": 1000,
+    "log_every": 100,
+    "output_dir": "./checkpoints/sequential"
+  },
+  "advanced": {
+    "use_dni": false,
+    "use_bitnet": false,
+    "enable_mswag": false,
+    "use_sgm": false
+  }
+}

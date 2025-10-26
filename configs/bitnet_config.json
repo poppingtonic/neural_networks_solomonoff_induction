@@ -1,0 +1,18 @@
+{
+  "name": "BitNet Configuration for Sequential Finetuning",
+  "quantization": {
+    "bits": 1,
+    "method": "bitnet",
+    "signed": true
+  },
+  "architecture": {
+    "activation_quantization": true,
+    "weight_quantization": true,
+    "group_size": 128
+  },
+  "training": {
+    "use_straight_through_estimator": true,
+    "quantize_gradients": false
+  },
+  "notes": "1-bit weights with full precision activations during training"
+}
