@@ -1,0 +1,209 @@
+================================================================================
+      SEQUENTIAL FINETUNING RECIPE - QUICK REFERENCE CARD
+================================================================================
+
+🎯 GOAL: UTM → CTW sequential finetuning for Universal Predictors
+
+📖 START HERE:
+   1. RECIPE_SUMMARY.md              ⭐ Overview & quick start
+   2. QUICKSTART_SEQUENTIAL_FINETUNE.md    5-minute guide
+   3. SEQUENTIAL_FINETUNING_RECIPE.md      Complete details
+
+================================================================================
+⚡ QUICK COMMANDS
+================================================================================
+
+# Install dependencies
+pip install -r requirements_sequential_finetune.txt
+
+# Quick test (2 minutes, debugging)
+./scripts/quick_test.sh
+
+# Demo (minimal example)
+python examples/sequential_finetune_demo.py
+
+# Full training (HuggingFace model)
+./scripts/run_sequential_finetune.sh
+
+# Manual training
+python torch_training/train_sequential_finetune.py \
+    --stage all \
+    --model_name_or_path Skywork/Skywork-Reward-V2-Qwen3-0.6B \
+    --use_hf \
+    --utm_steps 10000 \
+    --ctw_steps 5000 \
+    --batch_size 32 \
+    --seq_length 256 \
+    --lr 1e-5 \
+    --output_dir ./checkpoints/sequential
+
+# Evaluation
+python torch_training/evaluate_sequential.py \
+    --checkpoint_path ./checkpoints/sequential/stage2_ctw_final.pt \
+    --eval_utm --eval_ctw \
+    --num_eval_steps 100
+
+# Analysis
+python scripts/analyze_ctw_logs.py
+python scripts/compare_stages.py ./checkpoints/exp1 ./checkpoints/exp2
+
+================================================================================
+📊 TRAINING STAGES
+================================================================================
+
+Stage 1: UTM (Universal Turing Machine)
+  • Random valid programs
+  • Steps: 10,000 (default)
+  • LR: 1e-5
+  • Output: stage1_utm_final.pt
+
+Stage 2: CTW (Context Tree Weighting)
+  • Random binary trees
+  • Steps: 5,000 (default)
+  • LR: 5e-6 (lower!)
+  • Output: stage2_ctw_final.pt
+
+================================================================================
+🔑 KEY PARAMETERS
+================================================================================
+
+Parameter          | Stage 1 (UTM) | Stage 2 (CTW) | Flag
+-------------------|---------------|---------------|------------------
+Learning Rate      | 1e-5 to 5e-5  | 5e-6 to 1e-5  | --lr, --utm_lr, --ctw_lr
+Training Steps     | 5k - 20k      | 2k - 10k      | --utm_steps, --ctw_steps
+Batch Size         | 16-32         | 16-32         | --batch_size
+Sequence Length    | 256-512       | 256           | --seq_length
+Save Frequency     | 1000          | 1000          | --save_every
+Log Frequency      | 100           | 100           | --log_every
+
+================================================================================
+📁 OUTPUT STRUCTURE
+================================================================================
+
+checkpoints/sequential/
+├── train.log                  # Training logs
+├── metrics.json               # All metrics (JSON)
+├── stage1_utm_step_1000.pt   # Intermediate checkpoints
+├── stage1_utm_final.pt       # ⭐ End of Stage 1
+├── stage2_ctw_step_1000.pt
+└── stage2_ctw_final.pt       # ⭐⭐ FINAL MODEL
+
+================================================================================
+🎯 MODELS SUPPORTED
+================================================================================
+
+1. HuggingFace Models
+   • Skywork-Reward-V2-Qwen3-0.6B (recommended)
+   • Any AutoModelForCausalLM model
+   • Use: --use_hf
+
+2. Custom Transformer
+   • Built-in implementation
+   • Train first: python torch_training/train_sml.py
+   • Use: --model_name_or_path ./path/to/checkpoint.pt
+
+3. Existing Checkpoints
+   • Load any saved checkpoint
+   • Use: --model_name_or_path ./checkpoints/model.pt
+
+================================================================================
+🚀 ADVANCED FEATURES
+================================================================================
+
+Feature     | Flag              | Config/Path
+------------|-------------------|------------------------------------------
+MultiSWAG   | --enable_mswag   | Built-in (Bayesian uncertainty)
+DNI         | --use_dni        | --dni_path ~/src/dni-pytorch
+BitNet      | --use_bitnet     | --bitnet_config configs/bitnet_config.json
+SGM         | --use_sgm        | (Placeholder for integration)
+
+================================================================================
+🔧 STAGE CONTROL
+================================================================================
+
+# All stages (default)
+--stage all
+
+# UTM only
+--stage utm
+
+# CTW only (requires existing checkpoint)
+--stage ctw --model_name_or_path ./checkpoints/stage1_utm_final.pt
+
+================================================================================
+📊 MONITORING
+================================================================================
+
+# View logs in real-time
+tail -f ./checkpoints/sequential/train.log
+
+# Check metrics
+cat ./checkpoints/sequential/metrics.json | jq
+
+# Monitor GPU
+watch -n 1 nvidia-smi
+
+================================================================================
+🐛 TROUBLESHOOTING
+================================================================================
+
+Problem              | Solution
+---------------------|-----------------------------------------------
+CUDA OOM             | Reduce --batch_size or --seq_length
+Model not found      | Check HF model name or internet
+Import errors        | pip install transformers torch accelerate
+Slow training        | Verify GPU: nvidia-smi
+NaN/Inf losses       | Lower learning rate, add gradient clipping
+Permission denied    | chmod +x scripts/*.sh
+
+================================================================================
+📚 DOCUMENTATION MAP
+================================================================================
+
+RECIPE_SUMMARY.md                          ⭐ Start here (overview)
+QUICKSTART_SEQUENTIAL_FINETUNE.md          Quick 5-min guide
+SEQUENTIAL_FINETUNING_RECIPE.md            Complete recipe (all options)
+SEQUENTIAL_FINETUNE_INDEX.md               Navigation & reference
+RECIPE_IMPLEMENTATION_COMPLETE.md          Implementation checklist
+RECIPE_QUICK_REFERENCE.txt                 This card
+
+================================================================================
+🎓 LEARNING PATH
+================================================================================
+
+Beginner:    RECIPE_SUMMARY.md → quick_test.sh → demo.py
+Intermediate: QUICKSTART → run_sequential_finetune.sh → evaluate
+Advanced:     Full recipe → MultiSWAG → DNI → Custom architectures
+
+================================================================================
+📞 HELP
+================================================================================
+
+Documentation:  See RECIPE_SUMMARY.md
+Quick Start:    See QUICKSTART_SEQUENTIAL_FINETUNE.md
+Full Details:   See SEQUENTIAL_FINETUNING_RECIPE.md
+Navigation:     See SEQUENTIAL_FINETUNE_INDEX.md
+
+================================================================================
+✅ VERIFICATION
+================================================================================
+
+[ ] Install: pip install -r requirements_sequential_finetune.txt
+[ ] Test:    ./scripts/quick_test.sh
+[ ] Demo:    python examples/sequential_finetune_demo.py
+[ ] Train:   ./scripts/run_sequential_finetune.sh
+[ ] Eval:    python torch_training/evaluate_sequential.py ...
+
+================================================================================
+🎉 READY TO START!
+================================================================================
+
+Run this now:
+    ./scripts/quick_test.sh
+
+Then read:
+    RECIPE_SUMMARY.md
+
+Happy training! 🚀
+
+================================================================================
