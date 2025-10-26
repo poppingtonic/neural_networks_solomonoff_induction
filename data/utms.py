@@ -153,7 +153,7 @@ class MCSampler(ProgramSampler):
   def __init__(
       self,
       rng: np.random.Generator,
-      filename: str = 'ctx2_filtered.pyd',
+      filename: str = 'ctx2_filtered07.pyd',
       alpha: float = 0.5,
   ):
     """Initializes the sampler.
