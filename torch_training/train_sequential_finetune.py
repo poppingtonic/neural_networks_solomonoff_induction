@@ -6,6 +6,7 @@ Stage 2: Finetune on CTW data
 
 Supports:
 - HuggingFace pretrained models (e.g., Skywork-Reward-V2-Qwen3-0.6B)
+- Custom LSTM (default - better length generalization, https://arxiv.org/html/2401.14953v1)
 - Custom transformers
 - Optional MultiSWAG, DNI, BitNet
 """
@@ -29,9 +30,19 @@ from data import utm_data_generator as utm_dg
 from data import ctw_data_generator as ctw_dg
 from data import utms as utms_lib
 from torch_models.transformer import TransformerConfig, TransformerDecoderLM
+from torch_models.lstm import LSTMConfig, LSTMDecoderLM
 from utm_dataset import IGNORE_INDEX
 from dni_adapter import create_dni_model
+from swag_lora_adapter import create_swag_lora_model, update_swag_model
 
+# LLC Estimation (optional)
+try:
+    from devinterp.optim import SGLD
+    from devinterp.slt.sampler import estimate_learning_coeff_with_summary
+    from devinterp.utils import plot_trace, default_nbeta
+    DEVINTERP_AVAILABLE = True
+except ImportError:
+    DEVINTERP_AVAILABLE = False
 
 class SequentialFinetuner:
     """Manages sequential finetuning across UTM and CTW stages."""
@@ -257,8 +268,15 @@ def load_pretrained_model(
     model_name_or_path: str,
     device: str,
     use_hf: bool = False,
+    architecture: str = "lstm",
 ) -> Tuple[torch.nn.Module, Optional[int]]:
     """Load pretrained model from HuggingFace or local checkpoint.
+    
+    Args:
+        model_name_or_path: Path or HF model name
+        device: Device to load model on
+        use_hf: Force HuggingFace loading
+        architecture: Model architecture ('lstm' or 'transformer')
     
     Returns:
         model: Loaded model
@@ -287,11 +305,22 @@ def load_pretrained_model(
     if os.path.exists(model_name_or_path):
         print(f"Loading checkpoint from: {model_name_or_path}")
         checkpoint = torch.load(model_name_or_path, map_location=device)
-        config = TransformerConfig(**checkpoint["config"])
-        model = TransformerDecoderLM(config)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        print(f"✓ Loaded checkpoint with vocab_size={config.vocab_size}")
-        return model, config.vocab_size
+        
+        # Detect architecture from config
+        if "config" in checkpoint:
+            config_dict = checkpoint["config"]
+            if "num_heads" in config_dict:
+                config = TransformerConfig(**config_dict)
+                model = TransformerDecoderLM(config)
+                vocab_size = config.vocab_size
+            else:
+                config = LSTMConfig(**config_dict)
+                model = LSTMDecoderLM(config)
+                vocab_size = config.vocab_size
+            
+            model.load_state_dict(checkpoint["model_state_dict"])
+            print(f"✓ Loaded checkpoint with vocab_size={vocab_size}")
+            return model, vocab_size
     
     # Model path doesn't exist
     raise ValueError(f"Model not found: {model_name_or_path}")
@@ -352,13 +381,38 @@ def main(argv=None):
     parser.add_argument(
         "--model_name_or_path",
         type=str,
-        default="Skywork/Skywork-Reward-V2-Qwen3-0.6B",
-        help="HuggingFace model name or path to checkpoint",
+        default="lstm",
+        help="HuggingFace model name, path to checkpoint, or 'lstm'/'transformer' for custom models",
+    )
+    parser.add_argument(
+        "--architecture",
+        type=str,
+        choices=["lstm", "transformer"],
+        default="lstm",
+        help="Model architecture (lstm has better length generalization)",
     )
     parser.add_argument(
         "--use_hf",
         action="store_true",
         help="Force HuggingFace model loading",
+    )
+    parser.add_argument(
+        "--hidden_dim",
+        type=int,
+        default=256,
+        help="Hidden dimension for LSTM/Transformer",
+    )
+    parser.add_argument(
+        "--num_layers",
+        type=int,
+        default=2,
+        help="Number of layers",
+    )
+    parser.add_argument(
+        "--embedding_dim",
+        type=int,
+        default=128,
+        help="Embedding dimension",
     )
     parser.add_argument(
         "--device",
@@ -408,6 +462,16 @@ def main(argv=None):
     parser.add_argument("--use_bitnet", action="store_true", help="Use BitNet quantization")
     parser.add_argument("--enable_mswag", action="store_true", help="Enable MultiSWAG")
     
+    # SWAG-LoRA options
+    parser.add_argument("--use_lora", action="store_true", help="Use LoRA for parameter-efficient fine-tuning")
+    parser.add_argument("--lora_r", type=int, default=8, help="LoRA rank (lower = fewer parameters)")
+    parser.add_argument("--lora_alpha", type=int, default=16, help="LoRA alpha scaling")
+    parser.add_argument("--lora_dropout", type=float, default=0.1, help="LoRA dropout")
+    parser.add_argument("--use_swag", action="store_true", help="Use SWAG for uncertainty quantification")
+    parser.add_argument("--swag_start_epoch", type=int, default=10, help="Epoch to start SWAG")
+    parser.add_argument("--swag_update_freq", type=int, default=100, help="SWAG update frequency")
+    parser.add_argument("--swag_lr", type=float, default=1e-5, help="SWAG learning rate")
+    
     args = parser.parse_args(argv)
     
     # Set seeds
@@ -420,21 +484,51 @@ def main(argv=None):
             args.model_name_or_path,
             args.device,
             use_hf=args.use_hf,
+            architecture=args.architecture,
         )
     except Exception as e:
         print(f"Error loading model: {e}")
-        print("Creating custom transformer from scratch...")
-        # Create a custom transformer with default config
-        # You may want to adjust vocab_size based on your data
-        config = TransformerConfig(
-            vocab_size=128,  # ASCII default
-            embedding_dim=64,
-            num_layers=4,
-            num_heads=8,
-            widening_factor=4,
-        )
-        model = TransformerDecoderLM(config)
+        print(f"Creating custom {args.architecture} from scratch...")
+        
+        # Determine vocab size based on tokenizer
+        vocab_size = 128 if args.tokenizer == "ascii" else 512
+        
+        if args.architecture == "lstm":
+            print(f"Using LSTM (better length generalization, see https://arxiv.org/html/2401.14953v1)")
+            config = LSTMConfig(
+                vocab_size=vocab_size,
+                embedding_dim=args.embedding_dim,
+                hidden_dim=args.hidden_dim,
+                num_layers=args.num_layers,
+                dropout=0.2,
+            )
+            model = LSTMDecoderLM(config)
+        else:
+            config = TransformerConfig(
+                vocab_size=vocab_size,
+                embedding_dim=args.embedding_dim,
+                num_layers=args.num_layers,
+                num_heads=8,
+                widening_factor=4,
+            )
+            model = TransformerDecoderLM(config)
+        
         hf_vocab_size = None
+    
+    # Apply SWAG-LoRA if requested (before DNI for max efficiency)
+    swag_model = None
+    if args.use_lora or args.use_swag:
+        model, swag_model = create_swag_lora_model(
+            model=model,
+            use_lora=args.use_lora,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            use_swag=args.use_swag,
+            swag_start_epoch=args.swag_start_epoch,
+            swag_lr=args.swag_lr,
+            swag_update_freq=args.swag_update_freq,
+        )
     
     # Apply DNI if requested
     if args.use_dni:
@@ -457,8 +551,11 @@ def main(argv=None):
     
     finetuner.log(f"Sequential Finetuning Pipeline")
     finetuner.log(f"Model: {args.model_name_or_path}")
+    finetuner.log(f"Architecture: {args.architecture}")
     finetuner.log(f"Device: {args.device}")
     finetuner.log(f"Output: {args.output_dir}")
+    if args.architecture == "lstm":
+        finetuner.log(f"Note: LSTMs generalize better to longer sequences (https://arxiv.org/html/2401.14953v1)")
     
     # Determine learning rates
     utm_lr = args.utm_lr if args.utm_lr is not None else args.lr

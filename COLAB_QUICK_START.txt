@@ -1,0 +1,193 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║         COLAB QUICK START - Skywork Sequential Fine-tuning              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+█ STEP 1: SETUP (Run in first cell)
+═══════════════════════════════════════════════════════════════════════════
+
+!git clone https://github.com/google-deepmind/neural_networks_solomonoff_induction.git
+%cd neural_networks_solomonoff_induction
+!pip install -q torch transformers bitsandbytes accelerate numpy peft
+!pip install -q git+https://github.com/fortuinlab/swag-lora.git
+
+
+█ STEP 2: ENABLE GPU
+═══════════════════════════════════════════════════════════════════════════
+
+Runtime → Change runtime type → Hardware accelerator → GPU → Save
+
+
+█ STEP 3: RUN TRAINING (Choose ONE)
+═══════════════════════════════════════════════════════════════════════════
+
+▼ OPTION A: Minimal Test (5 minutes)
+────────────────────────────────────────────────────────────────────────────
+!python colab_train_minimal.py \
+  --steps 100 \
+  --batch_size 2 \
+  --seq_length 64
+
+
+▼ OPTION B: Quick Training (1 hour)
+────────────────────────────────────────────────────────────────────────────
+!python colab_train_minimal.py \
+  --steps 1000 \
+  --batch_size 4 \
+  --seq_length 128 \
+  --use_8bit
+
+
+▼ OPTION C: Full Training (4-6 hours)
+────────────────────────────────────────────────────────────────────────────
+!python torch_training/train_sequential_finetune.py \
+  --model_name_or_path "Skywork/Skywork-Reward-V2-Qwen3-0.6B" \
+  --use_hf \
+  --stage all \
+  --utm_steps 2000 \
+  --ctw_steps 1000 \
+  --batch_size 4 \
+  --seq_length 128
+
+
+▼ OPTION D: Skywork with SWAG-LoRA (Best Quality + Memory) ⭐⭐ NEW!
+────────────────────────────────────────────────────────────────────────────
+!python torch_training/train_sequential_finetune.py \
+  --model_name_or_path "Skywork/Skywork-Reward-V2-Qwen3-0.6B" \
+  --use_hf \
+  --use_lora \
+  --lora_r 8 \
+  --use_swag \
+  --stage all \
+  --utm_steps 5000 \
+  --ctw_steps 2500 \
+  --batch_size 16 \
+  --seq_length 256
+
+
+▼ OPTION E: LSTM (From Scratch, Most Efficient) ⭐ RECOMMENDED
+────────────────────────────────────────────────────────────────────────────
+!python torch_training/train_sequential_finetune.py \
+  --architecture lstm \
+  --hidden_dim 128 \
+  --num_layers 2 \
+  --stage all \
+  --utm_steps 5000 \
+  --ctw_steps 2500 \
+  --batch_size 16 \
+  --seq_length 256
+
+
+█ EMERGENCY: OUT OF MEMORY
+═══════════════════════════════════════════════════════════════════════════
+
+▼ Level 1: Reduce batch size
+────────────────────────────────────────────────────────────────────────────
+Add: --batch_size 2 --seq_length 64
+
+
+▼ Level 2: Ultra minimal
+────────────────────────────────────────────────────────────────────────────
+!python colab_train_minimal.py \
+  --batch_size 1 \
+  --seq_length 32 \
+  --steps 500
+
+
+▼ Level 3: Switch to LSTM
+────────────────────────────────────────────────────────────────────────────
+!python torch_training/train_sequential_finetune.py \
+  --architecture lstm \
+  --batch_size 8 \
+  --seq_length 128
+
+
+█ MONITOR TRAINING
+═══════════════════════════════════════════════════════════════════════════
+
+# Check GPU
+!nvidia-smi
+
+# Watch logs
+!tail -f ./checkpoints/colab/train.log
+
+# Check memory
+import torch
+print(f"Memory: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+
+
+█ SAVE TO GOOGLE DRIVE (Auto-backup)
+═══════════════════════════════════════════════════════════════════════════
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Save checkpoints
+!cp -r ./checkpoints /content/drive/MyDrive/skywork_checkpoints
+
+
+█ DOWNLOAD CHECKPOINTS
+═══════════════════════════════════════════════════════════════════════════
+
+!zip -r checkpoints.zip ./checkpoints
+from google.colab import files
+files.download('checkpoints.zip')
+
+
+█ MEMORY REFERENCE
+═══════════════════════════════════════════════════════════════════════════
+
+Configuration                Memory    Time      Status
+─────────────────────────────────────────────────────────────────────────
+Skywork batch=1              ~4GB      Slow      ✅ Safe
+Skywork batch=4 8bit         ~6GB      Normal    ✅ Works
+Skywork + LoRA r=8 batch=16  ~4GB      Fast      ✅✅ Great ⭐
+Skywork + LoRA r=16 batch=16 ~4.5GB    Fast      ✅✅ Excellent
+LSTM batch=16                ~2GB      Fast      ✅✅✅ Best
+─────────────────────────────────────────────────────────────────────────
+
+Colab Free GPU: 15GB (T4)
+Colab Pro GPU: 16-40GB (V100/A100)
+
+
+█ TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════
+
+Problem                 Solution
+────────────────────────────────────────────────────────────────────────────
+CUDA OOM               --batch_size 1 --seq_length 32
+Runtime disconnected   Mount Google Drive, save frequently
+No GPU                 Runtime → Change runtime type → GPU
+Slow download          Check internet, use smaller model
+Import error           !pip install transformers bitsandbytes
+────────────────────────────────────────────────────────────────────────────
+
+
+█ RECOMMENDED WORKFLOW
+═══════════════════════════════════════════════════════════════════════════
+
+1. Enable GPU runtime
+2. Run setup (clone repo, install packages)
+3. Mount Google Drive
+4. Start with LSTM (most reliable)
+5. Monitor memory usage
+6. Save checkpoints every 250 steps
+7. Download before 12-hour limit
+
+
+█ TIMING ESTIMATES (Colab Free T4)
+═══════════════════════════════════════════════════════════════════════════
+
+Config                          Steps    Time
+────────────────────────────────────────────────────────────────────────────
+Quick test                      100      5 min
+LSTM training                   5000     1-2 hours
+Skywork minimal                 1000     1-2 hours
+Skywork full                    3000     4-6 hours
+────────────────────────────────────────────────────────────────────────────
+
+⚠️  Colab free disconnects after 12 hours!
+
+
+═══════════════════════════════════════════════════════════════════════════
+For full documentation, see COLAB_README.md
+═══════════════════════════════════════════════════════════════════════════

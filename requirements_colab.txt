@@ -1,0 +1,32 @@
+# Colab-optimized requirements for Skywork sequential fine-tuning
+# Minimal dependencies to work within Colab constraints
+
+torch>=2.0.0
+transformers>=4.35.0
+numpy>=1.24.0
+
+# Memory optimization
+bitsandbytes>=0.41.0  # 8-bit quantization
+accelerate>=0.24.0    # Device mapping
+peft>=0.6.0           # LoRA and parameter-efficient fine-tuning
+
+# SWAG-LoRA (install from GitHub or local)
+# pip install git+https://github.com/fortuinlab/swag-lora.git
+# or: pip install -e ~/src/swag-lora
+
+# JAX dependencies (for data generators)
+jax>=0.4.13
+jaxlib>=0.4.13
+dm-haiku>=0.0.10
+optax>=0.1.7
+chex>=0.1.8
+
+# Optional: for better progress bars
+tqdm>=4.66.0
+
+# Note: Colab already has these pre-installed:
+# - numpy
+# - torch
+# - Basic scientific stack
+#
+# Only install what's missing!

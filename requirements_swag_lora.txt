@@ -1,0 +1,22 @@
+# SWAG-LoRA Requirements
+# For parameter-efficient fine-tuning with uncertainty quantification
+
+# Core dependencies
+torch>=2.0.0
+transformers>=4.35.0
+peft>=0.6.0
+
+# SWAG-LoRA
+# Option 1: Install from GitHub
+# pip install git+https://github.com/fortuinlab/swag-lora.git
+
+# Option 2: Install from local clone
+# git clone https://github.com/fortuinlab/swag-lora.git ~/src/swag-lora
+# pip install -e ~/src/swag-lora
+
+# Memory optimization (optional but recommended)
+bitsandbytes>=0.41.0  # For 8-bit quantization
+accelerate>=0.24.0    # For device mapping
+
+# Standard dependencies
+numpy>=1.24.0

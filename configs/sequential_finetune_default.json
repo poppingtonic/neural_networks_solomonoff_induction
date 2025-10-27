@@ -1,9 +1,13 @@
 {
   "experiment_name": "sequential_utm_ctw",
   "model": {
-    "name_or_path": "Skywork/Skywork-Reward-V2-Qwen3-0.6B",
-    "use_hf": true,
-    "device": "cuda"
+    "name_or_path": "lstm",
+    "architecture": "lstm",
+    "use_hf": false,
+    "device": "cuda",
+    "hidden_dim": 256,
+    "num_layers": 2,
+    "embedding_dim": 128
   },
   "stages": {
     "utm": {
