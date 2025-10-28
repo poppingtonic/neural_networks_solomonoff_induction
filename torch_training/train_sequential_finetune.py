@@ -96,8 +96,18 @@ class SequentialFinetuner:
         y = torch.from_numpy(targets).to(self.device)
         
         optimizer.zero_grad(set_to_none=True)
-        log_probs = self.model(x)
-        B, T, V = log_probs.shape
+        outputs = self.model(x)
+        
+        # Handle both HuggingFace and custom model outputs
+        if hasattr(outputs, 'logits'):
+            # HuggingFace model output
+            logits = outputs.logits
+        else:
+            # Custom model output (already logits)
+            logits = outputs
+        
+        B, T, V = logits.shape
+        log_probs = F.log_softmax(logits, dim=-1)
         
         loss = F.nll_loss(
             log_probs.reshape(B * T, V),
@@ -140,8 +150,18 @@ class SequentialFinetuner:
         y = x.clone()  # For CTW, we predict the sequence itself
         
         optimizer.zero_grad(set_to_none=True)
-        log_probs = self.model(x)
-        B, T, V = log_probs.shape
+        outputs = self.model(x)
+        
+        # Handle both HuggingFace and custom model outputs
+        if hasattr(outputs, 'logits'):
+            # HuggingFace model output
+            logits = outputs.logits
+        else:
+            # Custom model output (already logits)
+            logits = outputs
+        
+        B, T, V = logits.shape
+        log_probs = F.log_softmax(logits, dim=-1)
         
         loss = F.nll_loss(
             log_probs.reshape(B * T, V),
