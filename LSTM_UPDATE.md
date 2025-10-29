@@ -4,7 +4,7 @@
 
 Updated the sequential fine-tuning pipeline to use **LSTM as the default architecture** based on research showing superior length generalization compared to Transformers.
 
-**Reference:** [Length Generalization in Neural Language Models](https://arxiv.org/html/2401.14953v1)
+**Reference:** [Learning Universal Predictors](https://arxiv.org/html/2401.14953v1)
 
 ## Changes Made
 
