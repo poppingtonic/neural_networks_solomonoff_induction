@@ -1,0 +1,35 @@
+{
+  "base_model": "Qwen/Qwen3-30B-A3B-Instruct",
+  "lora_rank": 32,
+  "adam": {
+    "learning_rate": 0.0003,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 1e-12
+  },
+  "batch_size": 8,
+  "seq_length": 256,
+  "save_every": 50,
+  "log_every": 10,
+  "output_dir": "./runs/tinker_utm_voms_sft",
+  "seed": 1,
+  "stages": [
+    {
+      "name": "utm",
+      "steps": 200,
+      "utm": {
+        "memory_size": 10,
+        "maximum_steps": 100,
+        "maximum_program_length": 100
+      }
+    },
+    {
+      "name": "ctw",
+      "steps": 200,
+      "ctw": {
+        "max_depth": 5
+      }
+    }
+  ],
+  "resume_from_state": ""
+}

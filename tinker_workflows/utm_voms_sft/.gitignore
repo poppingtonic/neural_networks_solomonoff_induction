@@ -1,0 +1,3 @@
+runs/
+*.npz
+__pycache__/
