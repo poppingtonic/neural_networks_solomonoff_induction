@@ -1,0 +1,187 @@
+# Bloem-style Universal Pretraining Configuration
+# Based on Peter Bloem's "Universal pre-training by iterated random computation"
+#
+# Key insight: Training on sequences from randomly-initialized neural networks
+# approximates training on the Solomonoff universal prior.
+
+# =============================================================================
+# Experiment Presets
+# =============================================================================
+
+defaults:
+  target: lstm
+  num_tokens: 256
+  seq_length: 256
+  device: auto  # auto, cuda, cpu
+
+# -----------------------------------------------------------------------------
+# Quick Test (verify setup works)
+# -----------------------------------------------------------------------------
+quick_test:
+  target:
+    type: lstm
+    emb: 128
+    layers: 2
+  source:
+    emb: 64
+    layers: 1
+    weight_mult: [1.0, 2.0]
+    emb_mult: 1e-6
+    temperature: 0.7
+  training:
+    num_batches: 1000
+    batch_size: 32
+    source_batch_size: 64
+    buffer_size: 1000
+    lr: 3e-4
+  antisol:
+    enabled: false
+
+# -----------------------------------------------------------------------------
+# LSTM Target (Best for length generalization)
+# -----------------------------------------------------------------------------
+lstm_standard:
+  target:
+    type: lstm
+    emb: 256
+    layers: 2
+    dropout: 0.1
+  source:
+    emb: 128
+    layers: 2
+    weight_mult: [1.0, 3.5]
+    emb_mult: 1e-8
+    temperature: 0.5
+  training:
+    num_batches: 100000
+    batch_size: 64
+    source_batch_size: 128
+    buffer_size: 10000
+    lr: 3e-4
+    warmup_batches: 1000
+  antisol:
+    enabled: true
+    ratio: 0.1
+    start_batch: 5000
+  checkpointing:
+    save_every: 10000
+    eval_every: 500
+
+# -----------------------------------------------------------------------------
+# Transformer Target (Compare with LSTM)
+# -----------------------------------------------------------------------------
+transformer_standard:
+  target:
+    type: transformer
+    emb: 256
+    layers: 4
+    heads: 8
+    ff_mult: 4
+  source:
+    emb: 128
+    layers: 2
+    weight_mult: [1.0, 3.5]
+    emb_mult: 1e-8
+    temperature: 0.5
+  training:
+    num_batches: 100000
+    batch_size: 64
+    source_batch_size: 128
+    buffer_size: 10000
+    lr: 3e-4
+  antisol:
+    enabled: true
+    ratio: 0.1
+
+# -----------------------------------------------------------------------------
+# Ablation: No Anti-Solomonoff
+# -----------------------------------------------------------------------------
+lstm_no_antisol:
+  inherit: lstm_standard
+  antisol:
+    enabled: false
+
+# -----------------------------------------------------------------------------
+# Ablation: Fixed Source Weights (not randomly reinitialized)
+# -----------------------------------------------------------------------------
+lstm_fixed_source:
+  inherit: lstm_standard
+  source:
+    reinit_each_batch: false
+
+# -----------------------------------------------------------------------------
+# High Chaos (larger weight multiplier)
+# -----------------------------------------------------------------------------
+lstm_high_chaos:
+  inherit: lstm_standard
+  source:
+    weight_mult: [2.0, 5.0]
+
+# -----------------------------------------------------------------------------
+# Low Chaos (smaller weight multiplier)  
+# -----------------------------------------------------------------------------
+lstm_low_chaos:
+  inherit: lstm_standard
+  source:
+    weight_mult: [0.5, 1.5]
+
+# =============================================================================
+# Evaluation Datasets
+# =============================================================================
+
+eval_datasets:
+  # Algorithmic
+  - name: utm
+    type: utm
+    description: "Universal Turing Machine traces"
+    
+  - name: ctw
+    type: ctw
+    description: "Context Tree Weighting sequences"
+    
+  # Formal languages (from Bloem)
+  - name: dyck
+    type: dyck
+    description: "Balanced parentheses (context-free)"
+    p: 0.4375  # 7/16
+    
+  - name: ndfa
+    type: ndfa
+    description: "Non-deterministic automaton patterns"
+    p: 0.25
+    
+  # Arithmetic
+  - name: champernowne
+    type: champ
+    description: "0.123456789101112... (algorithmic but hard for n-gram)"
+    
+  # Bit operations
+  - name: bitsrep
+    type: bitsrep
+    description: "Repeated bit patterns"
+    wordlength: 3
+    rep: 3
+    
+  - name: bitsflip
+    type: bitsflip
+    description: "Palindromic bit sequences"
+    wordlength: 6
+
+# =============================================================================
+# Comparison with Standard Training
+# =============================================================================
+# 
+# Run these experiments to compare Bloem-style with our standard UTM+CTW training:
+#
+# 1. Bloem LSTM:
+#    python train_bloem_source.py --config bloem_config.yaml --preset lstm_standard
+#
+# 2. Standard LSTM (UTM+CTW):
+#    python train_sequential_finetune.py --architecture lstm --stage all
+#
+# 3. Compare length generalization:
+#    python evaluate_sequential.py --checkpoint1 bloem_final.pt --checkpoint2 stage2_ctw_final.pt
+#
+# Expected result: Bloem-trained model should generalize better to longer sequences
+# and out-of-distribution data because it has seen more diverse patterns.
+# =============================================================================

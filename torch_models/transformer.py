@@ -20,9 +20,14 @@ class TransformerConfig:
     num_heads: int = 8
     emb_init_scale: float = 0.02
     widening_factor: int = 4
+    # Randomized positional encoding params (for length generalization)
+    # See: https://arxiv.org/abs/2305.16843
+    use_randomized_pe: bool = False
+    pe_max_length: int = 2048  # Max length to sample positions from during training
 
 
 class PositionalEncoding(nn.Module):
+    """Standard sinusoidal positional encoding."""
     def __init__(self, d_model: int, max_len: int = 10000):
         super().__init__()
         pe = torch.zeros(max_len, d_model)
@@ -38,6 +43,47 @@ class PositionalEncoding(nn.Module):
         # x: (B, T, D)
         T = x.size(1)
         return x + self.pe[:T].unsqueeze(0)
+
+
+class RandomizedPositionalEncoding(nn.Module):
+    """Randomized positional encoding for improved length generalization.
+    
+    During training, randomly samples and sorts positions from [0, max_length)
+    instead of using sequential positions [0, 1, 2, ..., seq_len-1].
+    This simulates seeing longer sequences and makes the model robust to
+    out-of-distribution positions at test time.
+    
+    Reference: https://arxiv.org/abs/2305.16843
+    "Randomized Positional Encodings Boost Length Generalization of Transformers"
+    """
+    def __init__(self, d_model: int, max_len: int = 2048):
+        super().__init__()
+        self.max_len = max_len
+        # Precompute full positional encoding table
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2, dtype=torch.float32) * (-math.log(10000.0) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe, persistent=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (B, T, D)
+        B, T, D = x.shape
+        
+        if self.training and T < self.max_len:
+            # During training: randomly sample T positions from [0, max_len) and sort
+            # Each batch element gets the same random positions for consistency
+            indices = torch.randperm(self.max_len, device=x.device)[:T]
+            indices = torch.sort(indices).values
+            pos_enc = self.pe[indices].unsqueeze(0)  # (1, T, D)
+        else:
+            # During eval or if seq_len >= max_len: use standard sequential positions
+            pos_enc = self.pe[:T].unsqueeze(0)
+        
+        return x + pos_enc
 
 
 class TransformerDecoderLM(nn.Module):
@@ -63,7 +109,15 @@ class TransformerDecoderLM(nn.Module):
             norm_first=False,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=config.num_layers)
-        self.pos_enc = PositionalEncoding(config.embedding_dim)
+        
+        # Use randomized PE for length generalization if configured
+        if config.use_randomized_pe:
+            self.pos_enc = RandomizedPositionalEncoding(
+                config.embedding_dim, max_len=config.pe_max_length
+            )
+        else:
+            self.pos_enc = PositionalEncoding(config.embedding_dim)
+        
         self.norm = nn.LayerNorm(config.embedding_dim)
         self.out = nn.Linear(config.embedding_dim, config.vocab_size)
 
